@@ -1,0 +1,15 @@
+name = "ai-sync"
+main = "src/index.ts"
+compatibility_date = "2024-03-20"
+
+[[queues.consumers]]
+queue = "ai-sync-queue"
+max_batch_size = 10
+max_batch_timeout = 5
+
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "pothpancha-vectors"
+
+[ai]
+binding = "AI"
