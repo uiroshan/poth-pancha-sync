@@ -1,6 +1,6 @@
 name = "dispatcher"
 main = "src/index.ts"
-compatibility_date = "2024-03-20"
+compatibility_date = "2024-04-03"
 
 [triggers]
 crons = ["* * * * *"] # Configured to trigger every minute
@@ -16,3 +16,8 @@ binding = "MEDIA_SYNC"
 [[queues.producers]]
 queue = "ai-sync-queue"
 binding = "AI_SYNC"
+
+[vars]
+# Placeholder for the WooCommerce Webhook Secret
+# Set the actual value using: npx wrangler secret put WEBHOOK_SECRET
+WEBHOOK_SECRET = "placeholder-secret-change-me"
