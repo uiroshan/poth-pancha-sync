@@ -26,7 +26,15 @@ importers:
 
   apps/media-sync: {}
 
-  apps/search-sync: {}
+  apps/search-sync:
+    dependencies:
+      '@pothpancha/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20260310.1
+        version: 4.20260310.1
 
   packages/shared: {}
 
