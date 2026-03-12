@@ -3,9 +3,13 @@
     "version": "1.0.0",
     "scripts": {
         "dev": "wrangler dev",
-        "deploy": "wrangler deploy"
+        "deploy": "wrangler deploy",
+        "test": "vitest run"
     },
     "devDependencies": {
         "@cloudflare/workers-types": "^4.20260310.1"
+    },
+    "dependencies": {
+        "@pothpancha/shared": "workspace:*"
     }
 }

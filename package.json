@@ -3,6 +3,10 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --filter \"apps/*\" run dev",
-    "deploy": "pnpm --filter \"apps/*\" run deploy"
+    "deploy": "pnpm --filter \"apps/*\" run deploy",
+    "test": "pnpm -r run test"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.18"
   }
 }
