@@ -62,10 +62,10 @@ export default {
 
                 console.log(`Processing ${action} for product ID: ${payload.id}`);
 
-                if (action === 'create' || action === 'update' || action === 'restore') {
+                if (action === 'created' || action === 'updated' || action === 'restored') {
                     await upsertDocument(env, payload.data);
                     console.log(`Successfully upserted product ${payload.id} to Meilisearch`);
-                } else if (action === 'delete') {
+                } else if (action === 'deleted') {
                     await deleteDocument(env, payload.id);
                     console.log(`Successfully deleted product ${payload.id} from Meilisearch`);
                 } else {
