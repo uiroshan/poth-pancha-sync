@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { transformWooCommerceBook } from './book';
 
 describe('transformWooCommerceBook', () => {
-    it('should extract correct book details from a WooCommerce product payload', () => {
+    it('should extract correct book details from a WooCommerce product payload and map S3 images', () => {
         const mockRawProduct = {
             id: 123,
             name: 'Test Book',
@@ -20,7 +20,7 @@ describe('transformWooCommerceBook', () => {
                 { id: 1, name: 'Category 1', slug: 'category-1', description: 'Heavy description' }
             ],
             images: [
-                { id: 10, src: 'https://example.com/img1.jpg', alt: 'Img 1', date_created: '2026', date_modified: '2026' }
+                { id: 10, src: 'https://grade1lk.s3.ap-south-1.amazonaws.com/img1.jpg', alt: 'Img 1', date_created: '2026', date_modified: '2026' }
             ],
             attributes: [
                 { name: 'Writer', options: ['Jane Doe'] },
@@ -54,10 +54,12 @@ describe('transformWooCommerceBook', () => {
         });
         expect((result.categories?.[0] as any).description).toBeUndefined();
 
+        // Verify image rewriting
         expect(result.images?.[0]).toEqual({
-            src: 'https://example.com/img1.jpg',
+            src: 'https://imgs.pothpancha.lk/img1.jpg',
             alt: 'Img 1'
         });
+        expect(result.coverImage).toBe('https://imgs.pothpancha.lk/img1.jpg');
         expect((result.images?.[0] as any).date_created).toBeUndefined();
 
         // Verify removed root fields
@@ -65,7 +67,7 @@ describe('transformWooCommerceBook', () => {
         expect((result as any).meta_data).toBeUndefined();
     });
 
-    it('should handle books with missing attributes gracefully', () => {
+    it('should handle books with missing attributes and inject placeholders gracefully', () => {
         const mockRawProduct = {
             id: 124,
             name: 'Test Book Empty',
@@ -76,7 +78,11 @@ describe('transformWooCommerceBook', () => {
 
         expect(result.id).toBe(124);
         expect(result.categories).toEqual([]);
+        
+        // Verify placeholder injection
         expect(result.images).toEqual([]);
+        expect(result.coverImage).toBe('/placeholder.svg?height=600&width=400');
+        
         expect(result.noOfPages).toBe(0);
         expect(result.ageRange).toBe('');
     });

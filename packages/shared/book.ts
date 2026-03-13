@@ -113,10 +113,19 @@ export function transformWooCommerceBook(body: any): BookProduct {
     const categories = mapTaxonomy(body.categories);
     const tags = mapTaxonomy(body.tags);
 
-    const images = Array.isArray(body.images) 
-        ? body.images.map((img: any) => ({ src: img.src, alt: img.alt || '' })) 
-        : [];
-    const coverImage = images.length > 0 ? images[0].src : '';
+    const rawImages = Array.isArray(body.images) ? body.images : [];
+    
+    const mappedImages = rawImages.map((img: any) => ({
+      ...img,
+      src: img.src?.replace("https://grade1lk.s3.ap-south-1.amazonaws.com", "https://imgs.pothpancha.lk"),
+    }));
+
+    const images = mappedImages.map((img: any) => ({ 
+        src: img?.src || "/placeholder.svg?height=600&width=400", 
+        alt: img?.alt || '' 
+    }));
+    
+    const coverImage = images.length > 0 ? images[0].src : "/placeholder.svg?height=600&width=400";
 
     const seriesNoAttr = attributes.find((a: any) => a.name?.toLowerCase() === 'seriesno');
     const seriesNo = seriesNoAttr?.options?.[0] || undefined;
