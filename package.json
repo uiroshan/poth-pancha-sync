@@ -2,8 +2,8 @@
   "name": "pothpancha-sync",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter \"apps/*\" run dev",
-    "deploy": "pnpm --filter \"apps/*\" run deploy",
+    "dev": "pnpm --filter \"./apps/**\" run dev",
+    "deploy": "pnpm --filter \"./apps/**\" run deploy",
     "test": "pnpm -r run test"
   },
   "devDependencies": {
