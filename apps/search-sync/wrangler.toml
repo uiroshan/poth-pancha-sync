@@ -7,6 +7,12 @@ queue = "search-sync-queue"
 max_batch_size = 10
 max_batch_timeout = 5
 
+[vars]
+MEILISEARCH_HOST = "https://accepted-carlee-pothpancha-26ec3a8b.koyeb.app"
+MEILISEARCH_BOOKS_INDEX = "books_dev"
+# The MEILISEARCH_API_KEY will need to be configured via:
+# npx wrangler secret put MEILISEARCH_API_KEY
+
 [observability]
 enabled = true
 head_sampling_rate = 1

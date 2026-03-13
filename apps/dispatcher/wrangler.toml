@@ -20,7 +20,7 @@ binding = "SEARCH_SYNC"
 [vars]
 # Placeholder for the WooCommerce Webhook Secret
 # Set the actual value using: npx wrangler secret put WEBHOOK_SECRET
-WEBHOOK_SECRET = "placeholder-secret-change-me"
+# WEBHOOK_SECRET = "placeholder-secret-change-me"
 
 [observability]
 enabled = true
