@@ -1,5 +1,5 @@
 import type { ExecutionContext, ScheduledEvent, Queue } from '@cloudflare/workers-types';
-import { transformWooCommerceProduct } from '@pothpancha/shared';
+import { transformWooCommerceBook } from '@pothpancha/shared';
 
 interface Env {
     WEBHOOK_SECRET: string;
@@ -85,17 +85,17 @@ export default {
             // If the webhook is for a product (create, update, delete)
             if (topic.startsWith('product.')) {
                 
-                // Strip out heavy, unnecessary WooCommerce fields to stay under 128KB limit
-                const lightweightProduct = transformWooCommerceProduct(body);
+                // Extract full book schema parameters from the WooCommerce payload
+                const bookProduct = transformWooCommerceBook(body);
 
                 // Send to the search-sync-queue
                 if (env.SEARCH_SYNC) {
                     await env.SEARCH_SYNC.send({
                         action: topic.replace('product.', ''), // create, update, delete, restore
                         id: objectId,
-                        data: lightweightProduct 
+                        data: bookProduct 
                     });
-                    console.log(`Queued product ${objectId} to SEARCH_SYNC`);
+                    console.log(`Queued book product ${objectId} to SEARCH_SYNC`);
                 } else {
                     console.warn('SEARCH_SYNC queue binding is not configured in Env');
                 }

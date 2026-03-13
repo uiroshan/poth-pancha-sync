@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { transformWooCommerceProduct } from './index';
+import { transformWooCommerceBook } from './book';
 
-describe('transformWooCommerceProduct', () => {
-    it('should strip out heavy and unnecessary fields from a WooCommerce product payload', () => {
+describe('transformWooCommerceBook', () => {
+    it('should extract correct book details from a WooCommerce product payload', () => {
         const mockRawProduct = {
             id: 123,
-            name: 'Test Product',
-            slug: 'test-product',
+            name: 'Test Book',
+            slug: 'test-book',
             status: 'publish',
             price: '19.99',
             regular_price: '24.99',
@@ -22,53 +22,62 @@ describe('transformWooCommerceProduct', () => {
             images: [
                 { id: 10, src: 'https://example.com/img1.jpg', alt: 'Img 1', date_created: '2026', date_modified: '2026' }
             ],
+            attributes: [
+                { name: 'Writer', options: ['Jane Doe'] },
+                { name: 'Language', options: ['English'] },
+                { name: 'NoOfPages', options: ['120'] },
+                { name: 'AgeRange', options: ['4-8'] },
+                { name: 'ISBN', options: ['9781234567890'] }
+            ],
             ignored_heavy_field: 'This should be removed',
             meta_data: [{ id: 1, key: 'heavy_meta', value: 'very heavy' }]
         };
 
-        const result = transformWooCommerceProduct(mockRawProduct);
+        const result = transformWooCommerceBook(mockRawProduct);
 
         // Verify kept fields
         expect(result.id).toBe(123);
-        expect(result.name).toBe('Test Product');
-        expect(result.slug).toBe('test-product');
-        expect(result.status).toBe('publish');
-        expect(result.price).toBe('19.99');
-        expect(result.regular_price).toBe('24.99');
-        expect(result.stock_status).toBe('instock');
-        expect(result.total_sales).toBe(5);
+        expect(result.name).toBe('Test Book');
+        expect(result.slug).toBe('test-book');
+        expect(result.price).toBe(19.99);
+        expect(result.regularPrice).toBe(24.99);
+        expect(result.stockStatus).toBe('instock');
+        expect(result.totalSales).toBe(5);
+        expect(result.noOfPages).toBe(120);
+        expect(result.ageRange).toBe('4-8');
+        expect(result.isbn).toBe('9781234567890');
         
-        // Verify nested stripped fields
-        expect(result.categories[0]).toEqual({
-            id: 1,
+        // Verify nested mapped fields
+        expect(result.categories?.[0]).toEqual({
             name: 'Category 1',
             slug: 'category-1'
         });
-        expect((result.categories[0] as any).description).toBeUndefined();
+        expect((result.categories?.[0] as any).description).toBeUndefined();
 
-        expect(result.images[0]).toEqual({
-            id: 10,
+        expect(result.images?.[0]).toEqual({
             src: 'https://example.com/img1.jpg',
             alt: 'Img 1'
         });
-        expect((result.images[0] as any).date_created).toBeUndefined();
+        expect((result.images?.[0] as any).date_created).toBeUndefined();
 
         // Verify removed root fields
         expect((result as any).ignored_heavy_field).toBeUndefined();
         expect((result as any).meta_data).toBeUndefined();
     });
 
-    it('should handle products with no categories or images gracefully', () => {
+    it('should handle books with missing attributes gracefully', () => {
         const mockRawProduct = {
             id: 124,
-            name: 'Test Product Empty',
-            slug: 'test-product-empty'
+            name: 'Test Book Empty',
+            slug: 'test-book-empty'
         };
 
-        const result = transformWooCommerceProduct(mockRawProduct);
+        const result = transformWooCommerceBook(mockRawProduct);
 
         expect(result.id).toBe(124);
         expect(result.categories).toEqual([]);
         expect(result.images).toEqual([]);
+        expect(result.noOfPages).toBe(0);
+        expect(result.ageRange).toBe('');
     });
 });
