@@ -40,4 +40,4 @@ max_concurrency = 1
 [[kv_namespaces]]
 binding = "SYNC_STATE"
 id = "88fbb7f6ad63406a936254bc5e6d464b"
-
+preview_id = "f403a94ee8fa4503bf89e4eca4e7b2ab"

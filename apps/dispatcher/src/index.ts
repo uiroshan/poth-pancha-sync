@@ -167,7 +167,7 @@ export default {
                 // 1. Fetch exactly ONE page from WooCommerce
                 const perPage = 100;
                 const url = new URL(`${env.WOO_URL}/wp-json/wc/v3/products`);
-                url.searchParams.append('page', currentPage.toString());
+                url.searchParams.append('page', '1');
                 url.searchParams.append('per_page', perPage.toString());
 
                 // Fetch products modified after the date, in ascending order
@@ -224,7 +224,7 @@ export default {
                 if (products.length === perPage && env.WOO_FETCH_QUEUE) {
                     await env.WOO_FETCH_QUEUE.send({
                         action: 'fetch_page',
-                        page: 1, // Always fetch page 1 because we are advancing the 'after' date
+                        page: currentPage + 1, // Just using for logging purposes only
                         maxModifiedSeen: maxModifiedSeen
                     });
                     console.log(`Queued fetch for next batch starting after ${maxModifiedSeen}`);
