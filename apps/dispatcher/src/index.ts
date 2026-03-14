@@ -4,6 +4,7 @@ import { transformWooCommerceBook } from '@pothpancha/shared';
 interface Env {
     WEBHOOK_SECRET: string;
     SEARCH_SYNC: Queue;
+    MEDIA_SYNC: Queue;
     WOO_FETCH_QUEUE: Queue;
     WOO_URL: string;
     WOO_CONSUMER_KEY: string;
@@ -104,6 +105,17 @@ export default {
                 } else {
                     console.warn('SEARCH_SYNC queue binding is not configured in Env');
                 }
+
+                // Send raw images (S3 URLs) to media-sync-queue
+                const action = topic.replace('product.', '');
+                if (env.MEDIA_SYNC && Array.isArray(body.images) && body.images.length > 0) {
+                    await env.MEDIA_SYNC.send({
+                        productId: objectId,
+                        action: action === 'deleted' ? 'delete' : 'upsert',
+                        images: body.images.map((img: any) => ({ src: img.src, alt: img.alt || '' })),
+                    });
+                    console.log(`Queued ${body.images.length} images for product ${objectId} to MEDIA_SYNC`);
+                }
             }
 
             // Graceful Response to prevent the webhook from being disabled
@@ -179,7 +191,7 @@ export default {
                 console.log(`Fetched ${products.length} products from page ${currentPage}`);
 
                 // 2. Queue these products for down-stream processing
-                if (env.SEARCH_SYNC && products.length > 0) {
+                if (products.length > 0) {
                     for (const product of products) {
                         // Keep track of the latest 'date_modified_gmt' we've seen in this sync cycle
                         if (product.date_modified_gmt && product.date_modified_gmt > maxModifiedSeen) {
@@ -187,12 +199,25 @@ export default {
                         }
 
                         const bookProduct = transformWooCommerceBook(product);
-                        await env.SEARCH_SYNC.send({
-                            action: 'updated', // Treat periodic syncs as an update action
-                            id: product.id,
-                            data: bookProduct
-                        });
+
+                        if (env.SEARCH_SYNC) {
+                            await env.SEARCH_SYNC.send({
+                                action: 'updated',
+                                id: product.id,
+                                data: bookProduct
+                            });
+                        }
+
+                        // Send raw images (S3 URLs) to media-sync-queue
+                        if (env.MEDIA_SYNC && Array.isArray(product.images) && product.images.length > 0) {
+                            await env.MEDIA_SYNC.send({
+                                productId: product.id,
+                                action: 'upsert',
+                                images: product.images.map((img: any) => ({ src: img.src, alt: img.alt || '' })),
+                            });
+                        }
                     }
+                    console.log(`Queued ${products.length} products to SEARCH_SYNC and MEDIA_SYNC`);
                 }
 
                 // 3. THE MAGIC: If we received 100 products, there is likely a next page.

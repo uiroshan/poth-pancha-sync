@@ -9,9 +9,9 @@ crons = ["0 * * * *"]
 queue = "search-sync-queue"
 binding = "SEARCH_SYNC"
 
-# [[queues.producers]]
-# queue = "media-sync-queue"
-# binding = "MEDIA_SYNC"
+[[queues.producers]]
+queue = "media-sync-queue"
+binding = "MEDIA_SYNC"
 
 # [[queues.producers]]
 # queue = "ai-sync-queue"
