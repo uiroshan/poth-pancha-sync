@@ -83,6 +83,9 @@ export const bookSchema = z.object({
 
     // Added ISBN field to the Book interface
     isbn: z.string(),
+
+    // Publish status: 'publish', 'draft', 'pending', 'private'
+    status: z.string(),
 });
 
 export type BookProduct = z.infer<typeof bookSchema>;
@@ -199,6 +202,8 @@ export function transformWooCommerceBook(body: any): BookProduct {
         dateCreated: body.date_created ? new Date(body.date_created) : undefined,
         dateModified: body.date_modified ? new Date(body.date_modified) : undefined,
         
-        isbn
+        isbn,
+
+        status: body.status || '',
     });
 }
