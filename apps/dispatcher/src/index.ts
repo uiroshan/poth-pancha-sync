@@ -1,9 +1,14 @@
-import type { ExecutionContext, ScheduledEvent, Queue } from '@cloudflare/workers-types';
+import type { ExecutionContext, ScheduledEvent, Queue, MessageBatch, KVNamespace } from '@cloudflare/workers-types';
 import { transformWooCommerceBook } from '@pothpancha/shared';
 
 interface Env {
     WEBHOOK_SECRET: string;
     SEARCH_SYNC: Queue;
+    WOO_FETCH_QUEUE: Queue;
+    WOO_URL: string;
+    WOO_CONSUMER_KEY: string;
+    WOO_CONSUMER_SECRET: string;
+    SYNC_STATE: KVNamespace;
 }
 
 async function verifyWebhookSignature(
@@ -111,6 +116,106 @@ export default {
     },
 
     async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-        // Dispatcher logic here
+        if (env.WOO_FETCH_QUEUE) {
+            let lastSyncDate = '2000-01-01T00:00:00'; // Default fallback date
+
+            if (env.SYNC_STATE) {
+                const storedDate = await env.SYNC_STATE.get('last_sync_date');
+                if (storedDate) {
+                    lastSyncDate = storedDate;
+                }
+            } else {
+                console.warn('SYNC_STATE KV binding is not configured, defaulting to full sync.');
+            }
+
+            await env.WOO_FETCH_QUEUE.send({ 
+                action: 'fetch_page', 
+                page: 1,
+                after: lastSyncDate,
+                maxModifiedSeen: lastSyncDate // Track the maximum date we see during this sync run
+            });
+            console.log(`Kicked off periodic sync for page 1, fetching products modified after ${lastSyncDate}`);
+        } else {
+            console.error('WOO_FETCH_QUEUE binding is not configured');
+        }
+    },
+
+    async queue(batch: MessageBatch<any>, env: Env, ctx: ExecutionContext): Promise<void> {
+        for (const message of batch.messages) {
+            if (message.body.action === 'fetch_page') {
+                const currentPage = message.body.page;
+                const afterDate = message.body.after || '2000-01-01T00:00:00';
+                let maxModifiedSeen = message.body.maxModifiedSeen || afterDate;
+
+                console.log(`Processing fetch for page ${currentPage} (modified after ${afterDate})`);
+
+                if (!env.WOO_URL || !env.WOO_CONSUMER_KEY || !env.WOO_CONSUMER_SECRET) {
+                    console.error('WooCommerce API credentials are not configured in Env');
+                    return;
+                }
+
+                // 1. Fetch exactly ONE page from WooCommerce
+                const perPage = 100;
+                const url = new URL(`${env.WOO_URL}/wp-json/wc/v3/products`);
+                url.searchParams.append('page', currentPage.toString());
+                url.searchParams.append('per_page', perPage.toString());
+                
+                // Fetch products modified after the date, in ascending order
+                url.searchParams.append('modified_after', afterDate + 'Z'); // Woo expects ISO8601 with timezone (Z)
+                url.searchParams.append('orderby', 'modified'); // Keep newest modifications at the end
+                url.searchParams.append('order', 'asc');
+
+                const authHeader = 'Basic ' + btoa(`${env.WOO_CONSUMER_KEY}:${env.WOO_CONSUMER_SECRET}`);
+                const response = await fetch(url.toString(), {
+                    headers: {
+                        'Authorization': authHeader,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`WooCommerce API returned ${response.status}: ${await response.text()}`);
+                }
+
+                const products = await response.json() as any[];
+                console.log(`Fetched ${products.length} products from page ${currentPage}`);
+
+                // 2. Queue these products for down-stream processing
+                if (env.SEARCH_SYNC && products.length > 0) {
+                    for (const product of products) {
+                        // Keep track of the latest 'date_modified_gmt' we've seen in this sync cycle
+                        if (product.date_modified_gmt && product.date_modified_gmt > maxModifiedSeen) {
+                            maxModifiedSeen = product.date_modified_gmt;
+                        }
+
+                        const bookProduct = transformWooCommerceBook(product);
+                        await env.SEARCH_SYNC.send({
+                            action: 'update', // Treat periodic syncs as an update action
+                            id: product.id,
+                            data: bookProduct 
+                        });
+                    }
+                }
+
+                // 3. THE MAGIC: If we received 100 products, there is likely a next page.
+                if (products.length === perPage && env.WOO_FETCH_QUEUE) {
+                    await env.WOO_FETCH_QUEUE.send({ 
+                        action: 'fetch_page', 
+                        page: currentPage + 1,
+                        after: afterDate,
+                        maxModifiedSeen: maxModifiedSeen
+                    });
+                    console.log(`Queued fetch for page ${currentPage + 1}`);
+                } else if (products.length < perPage) {
+                    console.log('Finished full sync! No more pages.');
+
+                    // Since we're done, write the highest modified date we encountered back into Cloudflare KV
+                    if (env.SYNC_STATE) {
+                        await env.SYNC_STATE.put('last_sync_date', maxModifiedSeen);
+                        console.log(`Updated last_sync_date in KV to ${maxModifiedSeen}`);
+                    }
+                }
+            }
+        }
     }
 };
