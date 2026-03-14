@@ -6,3 +6,11 @@ compatibility_date = "2024-03-20"
 queue = "media-sync-queue"
 max_batch_size = 10
 max_batch_timeout = 5
+
+[[kv_namespaces]]
+binding = "MEDIA_STATE"
+id = "6abbc3620fd74a9a9eee67e90994e53a"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
