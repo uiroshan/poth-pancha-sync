@@ -89,7 +89,7 @@ export default {
 
             // If the webhook is for a product (create, update, delete)
             if (topic.startsWith('product.')) {
-                
+
                 // Extract full book schema parameters from the WooCommerce payload
                 const bookProduct = transformWooCommerceBook(body);
 
@@ -98,7 +98,7 @@ export default {
                     await env.SEARCH_SYNC.send({
                         action: topic.replace('product.', ''), // create, update, delete, restore
                         id: objectId,
-                        data: bookProduct 
+                        data: bookProduct
                     });
                     console.log(`Queued book product ${objectId} to SEARCH_SYNC`);
                 } else {
@@ -128,8 +128,8 @@ export default {
                 console.warn('SYNC_STATE KV binding is not configured, defaulting to full sync.');
             }
 
-            await env.WOO_FETCH_QUEUE.send({ 
-                action: 'fetch_page', 
+            await env.WOO_FETCH_QUEUE.send({
+                action: 'fetch_page',
                 page: 1,
                 after: lastSyncDate,
                 maxModifiedSeen: lastSyncDate // Track the maximum date we see during this sync run
@@ -159,7 +159,7 @@ export default {
                 const url = new URL(`${env.WOO_URL}/wp-json/wc/v3/products`);
                 url.searchParams.append('page', currentPage.toString());
                 url.searchParams.append('per_page', perPage.toString());
-                
+
                 // Fetch products modified after the date, in ascending order
                 url.searchParams.append('modified_after', afterDate + 'Z'); // Woo expects ISO8601 with timezone (Z)
                 url.searchParams.append('orderby', 'modified'); // Keep newest modifications at the end
@@ -190,17 +190,17 @@ export default {
 
                         const bookProduct = transformWooCommerceBook(product);
                         await env.SEARCH_SYNC.send({
-                            action: 'update', // Treat periodic syncs as an update action
+                            action: 'updated', // Treat periodic syncs as an update action
                             id: product.id,
-                            data: bookProduct 
+                            data: bookProduct
                         });
                     }
                 }
 
                 // 3. THE MAGIC: If we received 100 products, there is likely a next page.
                 if (products.length === perPage && env.WOO_FETCH_QUEUE) {
-                    await env.WOO_FETCH_QUEUE.send({ 
-                        action: 'fetch_page', 
+                    await env.WOO_FETCH_QUEUE.send({
+                        action: 'fetch_page',
                         page: currentPage + 1,
                         after: afterDate,
                         maxModifiedSeen: maxModifiedSeen
