@@ -173,7 +173,7 @@ export function transformWooCommerceBook(body: any): BookProduct {
         onSale: body.on_sale,
         date_on_sale_from: body.date_on_sale_from,
         date_on_sale_to: body.date_on_sale_to,
-        stock_quantity: body.stock_quantity,
+        stock_quantity: body.stock_quantity ?? undefined,
         stockStatus: body.stock_status,
         
         rating: parseFloat(body.average_rating || '0'),

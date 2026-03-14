@@ -117,12 +117,12 @@ export default {
 
     async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
         if (env.WOO_FETCH_QUEUE) {
-            let lastSyncDate = '2000-01-01T00:00:00'; // Default fallback date
+            let maxModifiedSeen = '2000-01-01T00:00:00'; // Default fallback date
 
             if (env.SYNC_STATE) {
-                const storedDate = await env.SYNC_STATE.get('last_sync_date');
+                const storedDate = await env.SYNC_STATE.get('max_modified_seen');
                 if (storedDate) {
-                    lastSyncDate = storedDate;
+                    maxModifiedSeen = storedDate;
                 }
             } else {
                 console.warn('SYNC_STATE KV binding is not configured, defaulting to full sync.');
@@ -131,10 +131,9 @@ export default {
             await env.WOO_FETCH_QUEUE.send({
                 action: 'fetch_page',
                 page: 1,
-                after: lastSyncDate,
-                maxModifiedSeen: lastSyncDate // Track the maximum date we see during this sync run
+                maxModifiedSeen: maxModifiedSeen // Track the maximum date we see during this sync run
             });
-            console.log(`Kicked off periodic sync for page 1, fetching products modified after ${lastSyncDate}`);
+            console.log(`Kicked off periodic sync for page 1, fetching products modified after ${maxModifiedSeen}`);
         } else {
             console.error('WOO_FETCH_QUEUE binding is not configured');
         }
@@ -144,10 +143,9 @@ export default {
         for (const message of batch.messages) {
             if (message.body.action === 'fetch_page') {
                 const currentPage = message.body.page;
-                const afterDate = message.body.after || '2000-01-01T00:00:00';
-                let maxModifiedSeen = message.body.maxModifiedSeen || afterDate;
+                let maxModifiedSeen = message.body.maxModifiedSeen || '2000-01-01T00:00:00';
 
-                console.log(`Processing fetch for page ${currentPage} (modified after ${afterDate})`);
+                console.log(`Processing fetch for page ${currentPage} (modified after ${maxModifiedSeen})`);
 
                 if (!env.WOO_URL || !env.WOO_CONSUMER_KEY || !env.WOO_CONSUMER_SECRET) {
                     console.error('WooCommerce API credentials are not configured in Env');
@@ -161,7 +159,7 @@ export default {
                 url.searchParams.append('per_page', perPage.toString());
 
                 // Fetch products modified after the date, in ascending order
-                url.searchParams.append('modified_after', afterDate + 'Z'); // Woo expects ISO8601 with timezone (Z)
+                url.searchParams.append('modified_after', maxModifiedSeen + 'Z'); // Woo expects ISO8601 with timezone (Z)
                 url.searchParams.append('orderby', 'modified'); // Keep newest modifications at the end
                 url.searchParams.append('order', 'asc');
 
@@ -201,19 +199,19 @@ export default {
                 if (products.length === perPage && env.WOO_FETCH_QUEUE) {
                     await env.WOO_FETCH_QUEUE.send({
                         action: 'fetch_page',
-                        page: currentPage + 1,
-                        after: afterDate,
+                        page: 1, // Always fetch page 1 because we are advancing the 'after' date
                         maxModifiedSeen: maxModifiedSeen
                     });
-                    console.log(`Queued fetch for page ${currentPage + 1}`);
+                    console.log(`Queued fetch for next batch starting after ${maxModifiedSeen}`);
                 } else if (products.length < perPage) {
                     console.log('Finished full sync! No more pages.');
+                }
 
-                    // Since we're done, write the highest modified date we encountered back into Cloudflare KV
-                    if (env.SYNC_STATE) {
-                        await env.SYNC_STATE.put('last_sync_date', maxModifiedSeen);
-                        console.log(`Updated last_sync_date in KV to ${maxModifiedSeen}`);
-                    }
+                // Checkpoint: write the highest modified date we've seen so far back into Cloudflare KV.
+                // Doing this per-page ensures we don't start from the beginning if a subsequent page fails.
+                if (env.SYNC_STATE) {
+                    await env.SYNC_STATE.put('max_modified_seen', maxModifiedSeen);
+                    console.log(`Updated max_modified_seen checkpoint in KV to ${maxModifiedSeen}`);
                 }
             }
         }

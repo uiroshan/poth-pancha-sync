@@ -35,6 +35,7 @@ binding = "WOO_FETCH_QUEUE"
 # Add this to consume the fetch events internally
 [[queues.consumers]]
 queue = "woo-fetch-queue"
+max_concurrency = 1
 
 [[kv_namespaces]]
 binding = "SYNC_STATE"
