@@ -9,7 +9,7 @@ max_batch_timeout = 5
 
 [[kv_namespaces]]
 binding = "MEDIA_STATE"
-id = "6abbc3620fd74a9a9eee67e90994e53a"
+id = "1caffea9d3c949609eb27573e20ecf66"
 
 [observability]
 enabled = true

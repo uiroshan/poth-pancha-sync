@@ -104,7 +104,7 @@ async function deleteImageFromCf(imageId: string, env: Env): Promise<void> {
 }
 
 /** Upsert: check KV → upload to CF → store record in KV. */
-async function processUpsertImage(
+async function  processUpsertImage(
     image: { src: string; alt: string },
     env: Env
 ): Promise<void> {
