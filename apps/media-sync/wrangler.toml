@@ -6,6 +6,7 @@ compatibility_date = "2024-03-20"
 queue = "media-sync-queue"
 max_batch_size = 10
 max_batch_timeout = 5
+max_concurrency = 1
 
 [[kv_namespaces]]
 binding = "MEDIA_STATE"

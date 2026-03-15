@@ -25,16 +25,33 @@ function getImageId(s3Url: string): string {
     return s3Url.replace(S3_BASE_URL, '');
 }
 
+/** Safely parse JSON from a response, returning null if it fails. */
+async function safeJsonParse(response: Response): Promise<any | null> {
+    try {
+        const text = await response.text();
+        return text ? JSON.parse(text) : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Sleep for a given number of milliseconds. */
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 /** Fetch an existing image record from CF Images by its custom ID. */
 async function fetchExistingCfImage(imageId: string, env: Env): Promise<CfImageRecord> {
+    const startTime = Date.now();
     const response = await fetch(
         `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/images/v1/${encodeURIComponent(imageId)}`,
         { headers: { Authorization: `Bearer ${env.CF_IMAGES_TOKEN}` } }
     );
-    const result = await response.json() as any;
+    const result = await safeJsonParse(response);
+    const elapsed = Date.now() - startTime;
 
-    if (!response.ok) {
-        console.warn(`Could not fetch existing CF image "${imageId}" [${response.status}], using constructed URL`);
+    if (!response.ok || !result) {
+        console.warn(`[FETCH_EXISTING] "${imageId}" failed (${response.status}, ${elapsed}ms) — using constructed URL`);
         return {
             cfImageId: imageId,
             cfUrl: `https://imagedelivery.net/${env.CF_ACCOUNT_ID}/${imageId}/public`,
@@ -43,9 +60,12 @@ async function fetchExistingCfImage(imageId: string, env: Env): Promise<CfImageR
     }
 
     const image = result.result;
+    const cfUrl = image.variants?.[0] ?? `https://imagedelivery.net/${env.CF_ACCOUNT_ID}/${imageId}/public`;
+    console.log(`[FETCH_EXISTING] "${imageId}" OK (${elapsed}ms) → ${cfUrl}`);
+
     return {
         cfImageId: image.id,
-        cfUrl: image.variants?.[0] ?? `https://imagedelivery.net/${env.CF_ACCOUNT_ID}/${imageId}/public`,
+        cfUrl,
         syncedAt: new Date().toISOString(),
     };
 }
@@ -56,6 +76,7 @@ async function uploadImageByUrl(s3Url: string, imageId: string, env: Env): Promi
     formData.append('url', s3Url);
     formData.append('id', imageId);
 
+    const startTime = Date.now();
     const response = await fetch(
         `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/images/v1`,
         {
@@ -64,32 +85,49 @@ async function uploadImageByUrl(s3Url: string, imageId: string, env: Env): Promi
             body: formData,
         }
     );
-    const result = await response.json() as any;
+    const elapsed = Date.now() - startTime;
+
+    // Rate limited
+    if (response.status === 429) {
+        console.error(`[UPLOAD] "${imageId}" RATE LIMITED (429, ${elapsed}ms)`);
+        throw new Error(`Rate limited (429) for "${imageId}"`);
+    }
+
+    const result = await safeJsonParse(response);
 
     if (!response.ok) {
         if (response.status === 409) {
-            // 409 Conflict = image already exists in CF Images
-            console.error(`Image already exists in CF Images: "${imageId}" — fetching real record`, JSON.stringify(result.errors));
-            //return fetchExistingCfImage(imageId, env);
+            console.log(`[UPLOAD] "${imageId}" ALREADY EXISTS (409, ${elapsed}ms)`);
             return {
                 cfImageId: imageId,
                 cfUrl: `https://imagedelivery.net/${env.CF_ACCOUNT_ID}/${imageId}/public`,
                 syncedAt: new Date().toISOString(),
             };
         }
-        throw new Error(`CF Images upload failed [${response.status}]: ${JSON.stringify(result.errors)}`);
+        const errors = result?.errors ? JSON.stringify(result.errors) : `(empty body)`;
+        console.error(`[UPLOAD] "${imageId}" FAILED (${response.status}, ${elapsed}ms): ${errors}`);
+        throw new Error(`Upload failed [${response.status}]: ${errors}`);
+    }
+
+    if (!result) {
+        console.error(`[UPLOAD] "${imageId}" EMPTY RESPONSE (${response.status}, ${elapsed}ms)`);
+        throw new Error(`Empty response for "${imageId}"`);
     }
 
     const image = result.result;
+    const cfUrl = image.variants?.[0] ?? `https://imagedelivery.net/${env.CF_ACCOUNT_ID}/${imageId}/public`;
+    console.log(`[UPLOAD] "${imageId}" OK (${elapsed}ms) → ${cfUrl}`);
+
     return {
         cfImageId: image.id,
-        cfUrl: image.variants?.[0] ?? `https://imagedelivery.net/${env.CF_ACCOUNT_ID}/${imageId}/public`,
+        cfUrl,
         syncedAt: new Date().toISOString(),
     };
 }
 
 /** Delete an image from CF Images by its custom ID. */
 async function deleteImageFromCf(imageId: string, env: Env): Promise<void> {
+    const startTime = Date.now();
     const response = await fetch(
         `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/images/v1/${encodeURIComponent(imageId)}`,
         {
@@ -97,20 +135,25 @@ async function deleteImageFromCf(imageId: string, env: Env): Promise<void> {
             headers: { Authorization: `Bearer ${env.CF_IMAGES_TOKEN}` },
         }
     );
+    const elapsed = Date.now() - startTime;
+
     if (!response.ok) {
-        const result = await response.json() as any;
-        throw new Error(`CF Images delete failed [${response.status}]: ${JSON.stringify(result.errors)}`);
+        const result = await safeJsonParse(response);
+        const errors = result?.errors ? JSON.stringify(result.errors) : `(empty body)`;
+        console.error(`[DELETE] "${imageId}" FAILED (${response.status}, ${elapsed}ms): ${errors}`);
+        throw new Error(`Delete failed [${response.status}]: ${errors}`);
     }
+
+    console.log(`[DELETE] "${imageId}" OK (${elapsed}ms)`);
 }
 
 /** Upsert: check KV → upload to CF → store record in KV. */
-async function  processUpsertImage(
+async function processUpsertImage(
     image: { src: string; alt: string },
     env: Env
-): Promise<void> {
+): Promise<'uploaded' | 'skipped_non_s3' | 'skipped_dedup' | 'exists'> {
     if (!image.src.startsWith(S3_BASE_URL)) {
-        console.log(`Skipping non-S3 image: ${image.src}`);
-        return;
+        return 'skipped_non_s3';
     }
 
     const imageId = getImageId(image.src);
@@ -119,15 +162,13 @@ async function  processUpsertImage(
     // Dedup: skip if already synced
     const existing = await env.MEDIA_STATE.get(kvKey, 'json') as CfImageRecord | null;
     if (existing) {
-        console.log(`Already synced ${kvKey} → ${existing.cfImageId}, skipping`);
-        return;
+        return 'skipped_dedup';
     }
 
-    console.log(`Uploading image: ${image.src} → CF id="${imageId}"`);
     const record = await uploadImageByUrl(image.src, imageId, env);
-
     await env.MEDIA_STATE.put(kvKey, JSON.stringify(record));
-    console.log(`Stored ${kvKey} → ${record.cfUrl}`);
+
+    return record.cfImageId === imageId ? 'exists' : 'uploaded';
 }
 
 /** Delete: remove from CF Images and clear KV record. */
@@ -140,44 +181,62 @@ async function processDeleteImage(
     const imageId = getImageId(image.src);
     const kvKey = `img_sync:${imageId}`;
 
-    console.log(`Deleting image: CF id="${imageId}"`);
     await deleteImageFromCf(imageId, env);
     await env.MEDIA_STATE.delete(kvKey);
-    console.log(`Deleted ${kvKey} from CF Images and KV`);
 }
 
 export default {
     async queue(batch: MessageBatch<MediaSyncMessage>, env: Env): Promise<void> {
+        const batchStart = Date.now();
+        const totalImages = batch.messages.reduce((sum, m) => sum + m.body.images.length, 0);
+        console.log(`[BATCH] Processing ${batch.messages.length} messages (${totalImages} total images)`);
+
         for (const message of batch.messages) {
             const { productId, action, images } = message.body;
-            console.log(`Processing ${action} for product ${productId} (${images.length} images)`);
+            const msgStart = Date.now();
 
             try {
-                // Fan-out: process all images in parallel
-                const tasks = images.map((image) => {
-                    // if (action === 'delete') {
-                    //     return processDeleteImage(image, env);
-                    // }
-                    return processUpsertImage(image, env);
-                });
+                let failCount = 0;
+                let uploadCount = 0;
+                let skipCount = 0;
+                let existsCount = 0;
 
-                const results = await Promise.allSettled(tasks);
-                const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+                // Process images sequentially to avoid hitting rate limits
+                for (let i = 0; i < images.length; i++) {
+                    try {
+                        if (action === 'delete') {
+                            await processDeleteImage(images[i], env);
+                            uploadCount++;
+                        } else {
+                            const result = await processUpsertImage(images[i], env);
+                            if (result === 'uploaded') uploadCount++;
+                            else if (result === 'exists') existsCount++;
+                            else skipCount++;
+                        }
+                        // Small delay between API calls to stay within rate limits
+                        if (i < images.length - 1) await sleep(100);
+                    } catch (err: any) {
+                        console.error(`[IMAGE] Product ${productId} image ${i + 1}/${images.length} FAILED: ${err.message}`);
+                        failCount++;
+                    }
+                }
 
-                if (failures.length > 0) {
-                    console.error(
-                        `Product ${productId}: ${failures.length}/${images.length} images failed:`,
-                        failures.map(f => f.reason?.message)
-                    );
-                    message.retry(); // Successful ones will be skipped via KV dedup on retry
+                const elapsed = Date.now() - msgStart;
+
+                if (failCount > 0) {
+                    console.error(`[PRODUCT] ${productId} ${action} — ${failCount} failed, ${uploadCount} uploaded, ${existsCount} existed, ${skipCount} skipped (${elapsed}ms) → RETRY`);
+                    message.retry();
                 } else {
-                    console.log(`Product ${productId}: all ${images.length} images synced`);
+                    console.log(`[PRODUCT] ${productId} ${action} — ${uploadCount} uploaded, ${existsCount} existed, ${skipCount} skipped (${elapsed}ms) → ACK`);
                     message.ack();
                 }
-            } catch (err) {
-                console.error(`Unexpected error for product ${productId}:`, err);
+            } catch (err: any) {
+                console.error(`[PRODUCT] ${productId} UNEXPECTED ERROR: ${err.message} → RETRY`);
                 message.retry();
             }
         }
+
+        const batchElapsed = Date.now() - batchStart;
+        console.log(`[BATCH] Complete — ${batch.messages.length} messages, ${totalImages} images in ${batchElapsed}ms`);
     },
 };
