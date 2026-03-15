@@ -49,7 +49,7 @@ async function getBatchToken(env: Env): Promise<string> {
     const response = await fetch(
         `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/images/v1/batch_token`,
         {
-            method: 'POST',
+            method: 'GET',
             headers: { Authorization: `Bearer ${env.CF_IMAGES_TOKEN}` },
         }
     );
