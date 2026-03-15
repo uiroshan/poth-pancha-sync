@@ -9,7 +9,7 @@ max_batch_timeout = 5
 
 [vars]
 MEILISEARCH_HOST = "https://accepted-carlee-pothpancha-26ec3a8b.koyeb.app"
-MEILISEARCH_BOOKS_INDEX = "books_dev"
+MEILISEARCH_BOOKS_INDEX = "books"
 # The MEILISEARCH_API_KEY will need to be configured via:
 # npx wrangler secret put MEILISEARCH_API_KEY
 

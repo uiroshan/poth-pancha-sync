@@ -10,7 +10,7 @@ max_concurrency = 1
 
 [[kv_namespaces]]
 binding = "MEDIA_STATE"
-id = "1caffea9d3c949609eb27573e20ecf66"
+id = "ecb5dab7b2fa4987ab6fb85096e9f2c7"
 
 [observability]
 enabled = true
