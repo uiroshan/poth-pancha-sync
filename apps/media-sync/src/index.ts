@@ -1,6 +1,7 @@
 import type { MessageBatch, KVNamespace } from '@cloudflare/workers-types';
 
 const S3_BASE_URL = 'https://grade1lk.s3.ap-south-1.amazonaws.com/';
+const BATCH_API_BASE = 'https://batch.imagedelivery.net';
 
 interface Env {
     CF_ACCOUNT_ID: string;
@@ -20,6 +21,11 @@ interface CfImageRecord {
     syncedAt: string;
 }
 
+interface BatchToken {
+    token: string;
+    expiresAt: number; // Unix timestamp
+}
+
 /** Derive CF Images custom ID from an S3 URL (the path portion). */
 function getImageId(s3Url: string): string {
     return s3Url.replace(S3_BASE_URL, '');
@@ -35,59 +41,52 @@ async function safeJsonParse(response: Response): Promise<any | null> {
     }
 }
 
-/** Sleep for a given number of milliseconds. */
-function sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/** Fetch an existing image record from CF Images by its custom ID. */
-async function fetchExistingCfImage(imageId: string, env: Env): Promise<CfImageRecord> {
-    const startTime = Date.now();
+/**
+ * Obtain a batch token from the CF Images API.
+ * Batch tokens bypass the global 1,200 req/5 min limit and allow 200 req/s.
+ */
+async function getBatchToken(env: Env): Promise<string> {
     const response = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/images/v1/${encodeURIComponent(imageId)}`,
-        { headers: { Authorization: `Bearer ${env.CF_IMAGES_TOKEN}` } }
+        `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/images/v1/batch_token`,
+        {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${env.CF_IMAGES_TOKEN}` },
+        }
     );
-    const result = await safeJsonParse(response);
-    const elapsed = Date.now() - startTime;
 
-    if (!response.ok || !result) {
-        console.warn(`[FETCH_EXISTING] "${imageId}" failed (${response.status}, ${elapsed}ms) — using constructed URL`);
-        return {
-            cfImageId: imageId,
-            cfUrl: `https://imagedelivery.net/${env.CF_ACCOUNT_ID}/${imageId}/public`,
-            syncedAt: new Date().toISOString(),
-        };
+    const result = await safeJsonParse(response);
+
+    if (!response.ok || !result?.result?.token) {
+        const errors = result?.errors ? JSON.stringify(result.errors) : `status ${response.status}`;
+        throw new Error(`Failed to get batch token: ${errors}`);
     }
 
-    const image = result.result;
-    const cfUrl = image.variants?.[0] ?? `https://imagedelivery.net/${env.CF_ACCOUNT_ID}/${imageId}/public`;
-    console.log(`[FETCH_EXISTING] "${imageId}" OK (${elapsed}ms) → ${cfUrl}`);
-
-    return {
-        cfImageId: image.id,
-        cfUrl,
-        syncedAt: new Date().toISOString(),
-    };
+    console.log(`[BATCH_TOKEN] Obtained batch token`);
+    return result.result.token;
 }
 
-/** Upload an image to CF Images by URL. Uses S3 path as custom ID for dedup. */
-async function uploadImageByUrl(s3Url: string, imageId: string, env: Env): Promise<CfImageRecord> {
+/** Upload an image via the batch API endpoint. */
+async function uploadImageByUrl(
+    s3Url: string,
+    imageId: string,
+    batchToken: string,
+    env: Env
+): Promise<CfImageRecord> {
     const formData = new FormData();
     formData.append('url', s3Url);
     formData.append('id', imageId);
 
     const startTime = Date.now();
     const response = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/images/v1`,
+        `${BATCH_API_BASE}/images/v1`,
         {
             method: 'POST',
-            headers: { Authorization: `Bearer ${env.CF_IMAGES_TOKEN}` },
+            headers: { Authorization: `Bearer ${batchToken}` },
             body: formData,
         }
     );
     const elapsed = Date.now() - startTime;
 
-    // Rate limited
     if (response.status === 429) {
         console.error(`[UPLOAD] "${imageId}" RATE LIMITED (429, ${elapsed}ms)`);
         throw new Error(`Rate limited (429) for "${imageId}"`);
@@ -125,14 +124,14 @@ async function uploadImageByUrl(s3Url: string, imageId: string, env: Env): Promi
     };
 }
 
-/** Delete an image from CF Images by its custom ID. */
-async function deleteImageFromCf(imageId: string, env: Env): Promise<void> {
+/** Delete an image via the batch API endpoint. */
+async function deleteImageFromCf(imageId: string, batchToken: string, env: Env): Promise<void> {
     const startTime = Date.now();
     const response = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/images/v1/${encodeURIComponent(imageId)}`,
+        `${BATCH_API_BASE}/images/v1/${encodeURIComponent(imageId)}`,
         {
             method: 'DELETE',
-            headers: { Authorization: `Bearer ${env.CF_IMAGES_TOKEN}` },
+            headers: { Authorization: `Bearer ${batchToken}` },
         }
     );
     const elapsed = Date.now() - startTime;
@@ -150,6 +149,7 @@ async function deleteImageFromCf(imageId: string, env: Env): Promise<void> {
 /** Upsert: check KV → upload to CF → store record in KV. */
 async function processUpsertImage(
     image: { src: string; alt: string },
+    batchToken: string,
     env: Env
 ): Promise<'uploaded' | 'skipped_non_s3' | 'skipped_dedup' | 'exists'> {
     if (!image.src.startsWith(S3_BASE_URL)) {
@@ -165,7 +165,7 @@ async function processUpsertImage(
         return 'skipped_dedup';
     }
 
-    const record = await uploadImageByUrl(image.src, imageId, env);
+    const record = await uploadImageByUrl(image.src, imageId, batchToken, env);
     await env.MEDIA_STATE.put(kvKey, JSON.stringify(record));
 
     return record.cfImageId === imageId ? 'exists' : 'uploaded';
@@ -174,6 +174,7 @@ async function processUpsertImage(
 /** Delete: remove from CF Images and clear KV record. */
 async function processDeleteImage(
     image: { src: string; alt: string },
+    batchToken: string,
     env: Env
 ): Promise<void> {
     if (!image.src.startsWith(S3_BASE_URL)) return;
@@ -181,7 +182,7 @@ async function processDeleteImage(
     const imageId = getImageId(image.src);
     const kvKey = `img_sync:${imageId}`;
 
-    await deleteImageFromCf(imageId, env);
+    await deleteImageFromCf(imageId, batchToken, env);
     await env.MEDIA_STATE.delete(kvKey);
 }
 
@@ -190,6 +191,18 @@ export default {
         const batchStart = Date.now();
         const totalImages = batch.messages.reduce((sum, m) => sum + m.body.images.length, 0);
         console.log(`[BATCH] Processing ${batch.messages.length} messages (${totalImages} total images)`);
+
+        // Obtain a batch token for this entire batch — 200 req/s rate limit
+        let batchToken: string;
+        try {
+            batchToken = await getBatchToken(env);
+        } catch (err: any) {
+            console.error(`[BATCH] Failed to get batch token: ${err.message} — retrying all messages`);
+            for (const message of batch.messages) {
+                message.retry();
+            }
+            return;
+        }
 
         for (const message of batch.messages) {
             const { productId, action, images } = message.body;
@@ -201,23 +214,30 @@ export default {
                 let skipCount = 0;
                 let existsCount = 0;
 
-                // Process images sequentially to avoid hitting rate limits
-                for (let i = 0; i < images.length; i++) {
+                // Fan-out: process all images in parallel (batch API allows 200 req/s)
+                const tasks = images.map(async (image) => {
                     try {
                         if (action === 'delete') {
-                            await processDeleteImage(images[i], env);
-                            uploadCount++;
-                        } else {
-                            const result = await processUpsertImage(images[i], env);
-                            if (result === 'uploaded') uploadCount++;
-                            else if (result === 'exists') existsCount++;
-                            else skipCount++;
+                            await processDeleteImage(image, batchToken, env);
+                            return 'uploaded' as const;
                         }
-                        // Small delay between API calls to stay within rate limits
-                        if (i < images.length - 1) await sleep(100);
+                        return await processUpsertImage(image, batchToken, env);
                     } catch (err: any) {
-                        console.error(`[IMAGE] Product ${productId} image ${i + 1}/${images.length} FAILED: ${err.message}`);
+                        console.error(`[IMAGE] Product ${productId} FAILED: ${err.message}`);
+                        throw err;
+                    }
+                });
+
+                const results = await Promise.allSettled(tasks);
+
+                for (const result of results) {
+                    if (result.status === 'rejected') {
                         failCount++;
+                    } else {
+                        const outcome = result.value;
+                        if (outcome === 'uploaded') uploadCount++;
+                        else if (outcome === 'exists') existsCount++;
+                        else skipCount++;
                     }
                 }
 
