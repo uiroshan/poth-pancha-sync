@@ -13,6 +13,10 @@ binding = "SEARCH_SYNC"
 queue = "media-sync-queue"
 binding = "MEDIA_SYNC"
 
+[[queues.producers]]
+queue = "order-sync-queue"
+binding = "ORDER_SYNC"
+
 # [[queues.producers]]
 # queue = "ai-sync-queue"
 # binding = "AI_SYNC"

@@ -10,6 +10,7 @@ interface Env {
     WOO_CONSUMER_KEY: string;
     WOO_CONSUMER_SECRET: string;
     SYNC_STATE: KVNamespace;
+    ORDER_SYNC: Queue;
 }
 
 async function verifyWebhookSignature(
@@ -115,6 +116,20 @@ export default {
                         images: body.images.map((img: any) => ({ src: img.src, alt: img.alt || '' })),
                     });
                     console.log(`Queued ${body.images.length} images for product ${objectId} to MEDIA_SYNC`);
+                }
+            }
+
+            // If the webhook is for an order
+            if (topic.startsWith('order.')) {
+                if (env.ORDER_SYNC) {
+                    await env.ORDER_SYNC.send({
+                        action: topic.replace('order.', ''), // created, updated, deleted, restored
+                        id: objectId,
+                        data: body
+                    });
+                    console.log(`Queued order ${objectId} to ORDER_SYNC`);
+                } else {
+                    console.warn('ORDER_SYNC queue binding is not configured in Env');
                 }
             }
 
