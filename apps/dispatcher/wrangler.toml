@@ -45,3 +45,37 @@ max_concurrency = 1
 binding = "SYNC_STATE"
 id = "88fbb7f6ad63406a936254bc5e6d464b"
 preview_id = "f403a94ee8fa4503bf89e4eca4e7b2ab"
+
+[env.staging]
+name = "dispatcher-staging"
+workers_dev = true
+
+[env.staging.vars]
+WOO_URL = "https://wp.pothpancha.lk"
+
+[[env.staging.kv_namespaces]]
+binding = "SYNC_STATE"
+id = "cbee95e55fe5400f83b8f2771fe99130"
+
+[[env.staging.queues.producers]]
+queue = "staging-search-sync-queue"
+binding = "SEARCH_SYNC"
+
+[[env.staging.queues.producers]]
+queue = "staging-media-sync-queue"
+binding = "MEDIA_SYNC"
+
+[[env.staging.queues.producers]]
+queue = "staging-order-sync-queue"
+binding = "ORDER_SYNC"
+
+[[env.staging.queues.producers]]
+queue = "staging-woo-fetch-queue"
+binding = "WOO_FETCH_QUEUE"
+
+[[env.staging.queues.consumers]]
+queue = "staging-woo-fetch-queue"
+max_concurrency = 1
+
+[env.staging.triggers]
+crons = ["0 * * * *"]
