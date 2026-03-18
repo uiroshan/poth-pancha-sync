@@ -4,9 +4,60 @@ interface Env {
     WHATSAPP_ACCESS_TOKEN: string;
     WHATSAPP_PHONE_NUMBER_ID: string;
     WHATSAPP_TEMPLATE_NAME?: string;
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: string;
 }
 
 export default {
+    async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
+        const url = new URL(request.url);
+
+        if (url.pathname === '/webhook' || url.pathname === '/') {
+            if (request.method === 'GET') {
+                const mode = url.searchParams.get('hub.mode');
+                const token = url.searchParams.get('hub.verify_token');
+                const challenge = url.searchParams.get('hub.challenge');
+
+                if (mode && token) {
+                    if (mode === 'subscribe' && token === env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) {
+                        console.log('Webhook verified successfully');
+                        return new Response(challenge, { status: 200 });
+                    }
+                    return new Response('Forbidden', { status: 403 });
+                }
+                return new Response('Bad Request', { status: 400 });
+            }
+
+            if (request.method === 'POST') {
+                try {
+                    const body = await request.json() as any;
+                    
+                    if (body.object === 'whatsapp_business_account') {
+                        console.log('Received WhatsApp Webhook body:', JSON.stringify(body));
+
+                        for (const entry of body.entry || []) {
+                            for (const change of entry.changes || []) {
+                                if (change.value && change.value.messages) {
+                                    for (const msg of change.value.messages) {
+                                        console.log('Received user reply:', JSON.stringify(msg));
+                                        // Process incoming message
+                                    }
+                                }
+                            }
+                        }
+                        
+                        return new Response('EVENT_RECEIVED', { status: 200 });
+                    }
+                    return new Response('Not Found', { status: 404 });
+                } catch (error) {
+                    console.error('Error processing webhook event:', error);
+                    return new Response('Internal Server Error', { status: 500 });
+                }
+            }
+        }
+
+        return new Response('Not Found', { status: 404 });
+    },
+
     async queue(batch: MessageBatch<any>, env: Env): Promise<void> {
         console.log(`Received batch of ${batch.messages.length} messages in whatsapp-sync`);
 

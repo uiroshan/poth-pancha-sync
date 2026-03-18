@@ -15,6 +15,7 @@ head_sampling_rate = 1
 # WHATSAPP_ACCESS_TOKEN = "" # Set via: npx wrangler secret put WHATSAPP_ACCESS_TOKEN
 # WHATSAPP_PHONE_NUMBER_ID = "" # Set via: npx wrangler secret put WHATSAPP_PHONE_NUMBER_ID
 WHATSAPP_TEMPLATE_NAME = "hello_world"
+# WHATSAPP_WEBHOOK_VERIFY_TOKEN = "" # Set via: npx wrangler secret put WHATSAPP_WEBHOOK_VERIFY_TOKEN
 
 [env.staging]
 name = "whatsapp-sync-staging"
@@ -24,6 +25,7 @@ workers_dev = true
 # WHATSAPP_ACCESS_TOKEN = "" # Set via: npx wrangler secret put WHATSAPP_ACCESS_TOKEN --env staging
 # WHATSAPP_PHONE_NUMBER_ID = "" # Set via: npx wrangler secret put WHATSAPP_PHONE_NUMBER_ID --env staging
 WHATSAPP_TEMPLATE_NAME = "hello_world"
+# WHATSAPP_WEBHOOK_VERIFY_TOKEN = "" # Set via: npx wrangler secret put WHATSAPP_WEBHOOK_VERIFY_TOKEN --env staging
 
 [[env.staging.queues.consumers]]
 queue = "staging-order-sync-queue"
