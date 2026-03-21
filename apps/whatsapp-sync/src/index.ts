@@ -78,7 +78,25 @@ export default {
                     if (numericPhone) {
                         console.log(`Sending WhatsApp message to ${numericPhone} for order ${orderId}`);
                         
-                        const templateName = env.WHATSAPP_TEMPLATE_NAME || 'hello_world';
+                        const orderStatus = orderData?.status;
+                        
+                        // Define your template names here based on the status
+                        const STATUS_TEMPLATES: Record<string, string> = {
+                            'processing': 'order_processing_template',
+                            'on-hold': 'order_onhold_template',
+                            'completed': 'order_completed_template',
+                            'cancelled': 'order_cancelled_template',
+                            'failed': 'order_failed_template'
+                        };
+                        
+                        const templateName = orderStatus ? STATUS_TEMPLATES[orderStatus] : null;
+
+                        if (!templateName) {
+                            console.log(`Skipping WhatsApp message for order ${orderId}: No template configured for status '${orderStatus}'`);
+                            message.ack();
+                            continue;
+                        }
+
                         const wabaPayload = {
                             messaging_product: "whatsapp",
                             to: numericPhone,
