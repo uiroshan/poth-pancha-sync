@@ -96,7 +96,7 @@ export default {
                                             },
                                             {
                                                 type: "text",
-                                                text: orderData?.number ? String(orderData.number) : String(orderId)
+                                                text: "#" + (orderData?.number ? String(orderData.number) : String(orderId))
                                             }
                                         ]
                                     }
