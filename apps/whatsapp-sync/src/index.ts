@@ -85,7 +85,22 @@ export default {
                             type: "template",
                             template: {
                                 name: templateName,
-                                language: { code: "en_US" }
+                                language: { code: "en_US" },
+                                components: [
+                                    {
+                                        type: "body",
+                                        parameters: [
+                                            {
+                                                type: "text",
+                                                text: orderData?.billing?.first_name || "Customer"
+                                            },
+                                            {
+                                                type: "text",
+                                                text: orderData?.number ? String(orderData.number) : String(orderId)
+                                            }
+                                        ]
+                                    }
+                                ]
                             }
                         };
 

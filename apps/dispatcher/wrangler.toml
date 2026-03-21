@@ -50,6 +50,9 @@ preview_id = "f403a94ee8fa4503bf89e4eca4e7b2ab"
 name = "dispatcher-staging"
 workers_dev = true
 
+[env.staging.triggers]
+crons = []
+
 [env.staging.vars]
 WOO_URL = "https://wp.pothpancha.lk"
 
@@ -76,3 +79,4 @@ binding = "WOO_FETCH_QUEUE"
 [[env.staging.queues.consumers]]
 queue = "staging-woo-fetch-queue"
 max_concurrency = 1
+
