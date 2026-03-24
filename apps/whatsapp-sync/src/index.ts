@@ -82,8 +82,8 @@ export default {
 
                         // Define your template names here based on the status
                         const STATUS_TEMPLATES: Record<string, string> = {
-                            'processing': 'order_processing_template',
-                            'on-hold': 'order_onhold_template',
+                            'processing': 'order_processing_template_2',
+                            'on-hold': 'order_onhold_template_2',
                             'completed': 'order_completed_template',
                             'cancelled': 'order_cancelled_template',
                             'failed': 'order_failed_template'
