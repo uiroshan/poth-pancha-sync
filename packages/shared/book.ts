@@ -92,13 +92,13 @@ export type BookProduct = z.infer<typeof bookSchema>;
 
 const getAttribute = (attributes: any[], name: string): AttributeValue[] => {
     if (!Array.isArray(attributes)) return [];
-    const attr = attributes.find((a: any) => 
+    const attr = attributes.find((a: any) =>
         a.name === name || a.name?.toLowerCase() === name.toLowerCase()
     );
     if (!attr || !Array.isArray(attr.options)) return [];
-    return attr.options.map((opt: string) => ({ 
-        name: opt, 
-        slug: opt.toLowerCase().replace(/\s+/g, '-') 
+    return attr.options.map((opt: string) => ({
+        name: opt,
+        slug: opt.toLowerCase().replace(/\s+/g, '-')
     }));
 };
 
@@ -109,40 +109,42 @@ const getSingleAttribute = (attributes: any[], name: string): AttributeValue | u
 
 export function transformWooCommerceBook(body: any): BookProduct {
     const attributes = body.attributes || [];
-    
-    const mapTaxonomy = (items: any[]) => 
+
+    const mapTaxonomy = (items: any[]) =>
         Array.isArray(items) ? items.map((c: any) => ({ name: c.name, slug: c.slug })) : [];
-    
+
     const categories = mapTaxonomy(body.categories);
     const tags = mapTaxonomy(body.tags);
 
     const rawImages = Array.isArray(body.images) ? body.images : [];
-    
+
     const mappedImages = rawImages.map((img: any) => ({
-      ...img,
-      src: img.src?.replace("https://grade1lk.s3.ap-south-1.amazonaws.com", "https://imgs.pothpancha.lk"),
+        ...img,
+        src: img.src?.replace("https://grade1lk.s3.ap-south-1.amazonaws.com", "https://imgs.pothpancha.lk")
+            ?.replace("https://wp.pothpancha.lk/wp-content", "https://imgs.pothpancha.lk")
+            ?.replace("http://wp.pothpancha.lk/wp-content", "https://imgs.pothpancha.lk"),
     }));
 
-    const images = mappedImages.map((img: any) => ({ 
-        src: img?.src || "/placeholder.svg?height=600&width=400", 
-        alt: img?.alt || '' 
+    const images = mappedImages.map((img: any) => ({
+        src: img?.src || "/placeholder.svg?height=600&width=400",
+        alt: img?.alt || ''
     }));
-    
+
     const coverImage = images.length > 0 ? images[0].src : "/placeholder.svg?height=600&width=400";
 
     const seriesNoAttr = attributes.find((a: any) => a.name?.toLowerCase() === 'seriesno');
     const seriesNo = seriesNoAttr?.options?.[0] || undefined;
-    
-    const noOfPagesAttr = attributes.find((a: any) => 
+
+    const noOfPagesAttr = attributes.find((a: any) =>
         a.name?.toLowerCase() === 'noofpages' || a.name?.toLowerCase() === 'number of pages'
     );
     const noOfPages = noOfPagesAttr ? parseInt(noOfPagesAttr.options?.[0], 10) || 0 : 0;
-    
-    const ageRangeAttr = attributes.find((a: any) => 
+
+    const ageRangeAttr = attributes.find((a: any) =>
         a.name?.toLowerCase() === 'agerange' || a.name?.toLowerCase() === 'age range'
     );
     const ageRange = ageRangeAttr?.options?.[0] || '';
-    
+
     const isbnAttr = attributes.find((a: any) => a.name?.toLowerCase() === 'isbn');
     const isbn = isbnAttr?.options?.[0] || '';
 
@@ -150,27 +152,27 @@ export function transformWooCommerceBook(body: any): BookProduct {
         id: body.id,
         slug: body.slug,
         name: body.name,
-        
+
         writer: getAttribute(attributes, 'writer'),
         illustrator: getAttribute(attributes, 'illustrator'),
         publisher: getSingleAttribute(attributes, 'publisher'),
         language: getAttribute(attributes, 'language'),
         grade: getSingleAttribute(attributes, 'grade'),
-        
+
         noOfPages,
         short_description: body.short_description || '',
         description: body.description || '',
-        
+
         ageRange,
         storyTellingAge: getAttribute(attributes, 'storyTellingAge'),
         selfReadingAge: getAttribute(attributes, 'selfReadingAge'),
-        
+
         series: getSingleAttribute(attributes, 'series'),
         seriesNo,
-        
+
         coverImage,
         images,
-        
+
         price: parseFloat(body.price || '0'),
         regularPrice: parseFloat(body.regular_price || '0') || undefined,
         onSale: body.on_sale,
@@ -178,22 +180,22 @@ export function transformWooCommerceBook(body: any): BookProduct {
         date_on_sale_to: body.date_on_sale_to,
         stock_quantity: body.stock_quantity ?? undefined,
         stockStatus: body.stock_status,
-        
+
         rating: parseFloat(body.average_rating || '0'),
         reviewCount: parseInt(body.rating_count || '0', 10),
-        
+
         weight: parseFloat(body.weight || '0') || undefined,
         dimensions: body.dimensions ? {
             length: parseFloat(body.dimensions.length || '0') || undefined,
             width: parseFloat(body.dimensions.width || '0') || undefined,
             height: parseFloat(body.dimensions.height || '0') || undefined,
         } : undefined,
-        
+
         categories,
         tags,
-        
+
         relatedIds: body.related_ids,
-        
+
         sku: body.sku,
         featured: body.featured,
         purchasable: body.purchasable,
@@ -201,7 +203,7 @@ export function transformWooCommerceBook(body: any): BookProduct {
         permalink: body.permalink,
         dateCreated: body.date_created ? new Date(body.date_created) : undefined,
         dateModified: body.date_modified ? new Date(body.date_modified) : undefined,
-        
+
         isbn,
 
         status: body.status || '',

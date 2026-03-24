@@ -30,7 +30,7 @@ export default {
             if (request.method === 'POST') {
                 try {
                     const body = await request.json() as any;
-                    
+
                     if (body.object === 'whatsapp_business_account') {
                         console.log('Received WhatsApp Webhook body:', JSON.stringify(body));
 
@@ -44,7 +44,7 @@ export default {
                                 }
                             }
                         }
-                        
+
                         return new Response('EVENT_RECEIVED', { status: 200 });
                     }
                     return new Response('Not Found', { status: 404 });
@@ -74,12 +74,12 @@ export default {
                 const rawPhone = orderData?.billing?.phone;
                 if (rawPhone) {
                     const numericPhone = rawPhone.replace(/\\D/g, '');
-                    
+
                     if (numericPhone) {
                         console.log(`Sending WhatsApp message to ${numericPhone} for order ${orderId}`);
-                        
+
                         const orderStatus = orderData?.status;
-                        
+
                         // Define your template names here based on the status
                         const STATUS_TEMPLATES: Record<string, string> = {
                             'processing': 'order_processing_template',
@@ -88,7 +88,7 @@ export default {
                             'cancelled': 'order_cancelled_template',
                             'failed': 'order_failed_template'
                         };
-                        
+
                         const templateName = orderStatus ? STATUS_TEMPLATES[orderStatus] : null;
 
                         if (!templateName) {
@@ -99,7 +99,7 @@ export default {
 
                         const wabaPayload = {
                             messaging_product: "whatsapp",
-                            to: numericPhone,
+                            to: "+94713280622",
                             type: "template",
                             template: {
                                 name: templateName,
@@ -114,7 +114,7 @@ export default {
                                             },
                                             {
                                                 type: "text",
-                                                text: "#" + (orderData?.number ? String(orderData.number) : String(orderId))
+                                                text: (orderData?.number ? String(orderData.number) : String(orderId))
                                             }
                                         ]
                                     }
@@ -136,7 +136,7 @@ export default {
                             console.error(`WhatsApp API Error for order ${orderId}: ${response.status} ${response.statusText}`, errorText);
                             throw new Error(`WhatsApp API request failed: ${response.status}`);
                         }
-                        
+
                         console.log(`WhatsApp message sent successfully for order ${orderId}`);
                     } else {
                         console.log(`Order ${orderId} has phone field but contains no digits: ${rawPhone}`);
