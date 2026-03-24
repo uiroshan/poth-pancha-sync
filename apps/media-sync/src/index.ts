@@ -1,6 +1,8 @@
 import type { MessageBatch, KVNamespace } from '@cloudflare/workers-types';
 
 const S3_BASE_URL = 'https://grade1lk.s3.ap-south-1.amazonaws.com/';
+const WP_BASE_URL = 'https://wp.pothpancha.lk/wp-content/';
+const WP_HTTP_BASE_URL = 'http://wp.pothpancha.lk/wp-content/';
 const BATCH_API_BASE = 'https://batch.imagedelivery.net';
 
 interface Env {
@@ -26,9 +28,16 @@ interface BatchToken {
     expiresAt: number; // Unix timestamp
 }
 
+function isValidMediaUrl(url: string): boolean {
+    return url.startsWith(S3_BASE_URL) || url.startsWith(WP_BASE_URL) || url.startsWith(WP_HTTP_BASE_URL);
+}
+
 /** Derive CF Images custom ID from an S3 URL (the path portion). */
 function getImageId(s3Url: string): string {
-    return s3Url.replace(S3_BASE_URL, '');
+    return s3Url
+        .replace(S3_BASE_URL, '')
+        .replace(WP_BASE_URL, '')
+        .replace(WP_HTTP_BASE_URL, '');
 }
 
 /** Safely parse JSON from a response, returning null if it fails. */
@@ -152,7 +161,7 @@ async function processUpsertImage(
     batchToken: string,
     env: Env
 ): Promise<'uploaded' | 'skipped_non_s3' | 'skipped_dedup' | 'exists'> {
-    if (!image.src.startsWith(S3_BASE_URL)) {
+    if (!isValidMediaUrl(image.src)) {
         return 'skipped_non_s3';
     }
 
@@ -177,7 +186,7 @@ async function processDeleteImage(
     batchToken: string,
     env: Env
 ): Promise<void> {
-    if (!image.src.startsWith(S3_BASE_URL)) return;
+    if (!isValidMediaUrl(image.src)) return;
 
     const imageId = getImageId(image.src);
     const kvKey = `img_sync:${imageId}`;
