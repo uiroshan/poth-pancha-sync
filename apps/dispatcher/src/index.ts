@@ -126,6 +126,7 @@ export default {
                     const metaData: Array<{ key: string; value: string }> = body.meta_data || [];
                     const whatsappNumber = metaData.find((m: { key: string }) => m.key === 'whatsapp_number')?.value;
                     const whatsappOptIn = metaData.find((m: { key: string }) => m.key === 'whatsapp_opt_in')?.value;
+                    const wayBillId = metaData.find((m: { key: string }) => m.key === 'way_bill_id')?.value;
 
                     await env.ORDER_SYNC.send({
                         action: topic.replace('order.', ''), // created, updated, deleted, restored
@@ -139,6 +140,7 @@ export default {
                             },
                             whatsapp_number: whatsappNumber,
                             whatsapp_opt_in: whatsappOptIn,
+                            way_bill_id: wayBillId,
                         }
                     });
                     console.log(`Queued order ${objectId} to ORDER_SYNC`);

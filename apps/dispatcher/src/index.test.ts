@@ -106,6 +106,7 @@ describe('Dispatcher Worker', () => {
                 { id: 1, key: 'whatsapp_number', value: '0761234567' },
                 { id: 2, key: 'whatsapp_opt_in', value: 'yes' },
                 { id: 3, key: 'some_other_meta', value: 'should_be_ignored' },
+                { id: 4, key: 'way_bill_id', value: 'WB-98765' },
             ],
         });
         const signature = await generateSignature(payload, mockEnv.WEBHOOK_SECRET);
@@ -137,6 +138,7 @@ describe('Dispatcher Worker', () => {
                 },
                 whatsapp_number: '0761234567',
                 whatsapp_opt_in: 'yes',
+                way_bill_id: 'WB-98765',
             },
         });
 
