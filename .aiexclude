@@ -1,0 +1,16 @@
+# AI Exclude List for pothpancha-sync
+# This file prevents the AI from reading large/generated files and sensitive secrets.
+
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+
+# Cloudflare Workers generated directories
+.wrangler/
+dist/
+build/
+
+# Secrets and environment files
+.dev.vars
+.env
+.env.*
