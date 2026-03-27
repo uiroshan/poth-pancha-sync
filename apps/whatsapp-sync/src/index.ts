@@ -110,10 +110,12 @@ export default {
                                         parameters: [
                                             {
                                                 type: "text",
+                                                parameter_name: "customer_name",
                                                 text: orderData?.billing?.first_name || "Customer"
                                             },
                                             {
                                                 type: "text",
+                                                parameter_name: "order_id",
                                                 text: (orderData?.number ? String(orderData.number) : String(orderId))
                                             }
                                         ]
