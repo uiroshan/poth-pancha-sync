@@ -85,6 +85,69 @@ describe('Dispatcher Worker', () => {
         expect(queuedData.data.name).toBe('Test Product');
     });
 
+    it('should queue only required fields for order webhooks', async () => {
+        mockEnv.ORDER_SYNC = { send: vi.fn() };
+
+        const payload = JSON.stringify({
+            id: 500,
+            status: 'processing',
+            number: '1234',
+            billing: {
+                first_name: 'Kasun',
+                last_name: 'Perera',
+                phone: '0771234567',
+                email: 'kasun@example.com',
+                address_1: '123 Main St',
+            },
+            shipping: { address_1: '456 Ship St' },
+            line_items: [{ id: 1, name: 'Book A', quantity: 2 }],
+            total: '5000.00',
+            meta_data: [
+                { id: 1, key: 'whatsapp_number', value: '0761234567' },
+                { id: 2, key: 'whatsapp_opt_in', value: 'yes' },
+                { id: 3, key: 'some_other_meta', value: 'should_be_ignored' },
+            ],
+        });
+        const signature = await generateSignature(payload, mockEnv.WEBHOOK_SECRET);
+
+        const request = new Request('http://localhost/', {
+            method: 'POST',
+            headers: {
+                'X-WC-Webhook-Signature': signature,
+                'X-WC-Webhook-Topic': 'order.created',
+                'X-WC-Webhook-Source': 'https://wp.pothpancha.lk/',
+            },
+            body: payload,
+        });
+
+        const response = await worker.fetch(request, mockEnv, mockCtx);
+        expect(response.status).toBe(200);
+
+        expect(mockEnv.ORDER_SYNC.send).toHaveBeenCalledTimes(1);
+        const queued = mockEnv.ORDER_SYNC.send.mock.calls[0][0];
+        expect(queued).toEqual({
+            action: 'created',
+            id: 500,
+            data: {
+                status: 'processing',
+                number: '1234',
+                billing: {
+                    phone: '0771234567',
+                    first_name: 'Kasun',
+                },
+                whatsapp_number: '0761234567',
+                whatsapp_opt_in: 'yes',
+            },
+        });
+
+        // Ensure no extra fields leaked through
+        expect(queued.data.billing.last_name).toBeUndefined();
+        expect(queued.data.billing.email).toBeUndefined();
+        expect(queued.data.shipping).toBeUndefined();
+        expect(queued.data.line_items).toBeUndefined();
+        expect(queued.data.total).toBeUndefined();
+    });
+
     it('should reject an invalid signature', async () => {
         const payload = JSON.stringify({ id: 100 });
         const request = new Request('http://localhost/', {

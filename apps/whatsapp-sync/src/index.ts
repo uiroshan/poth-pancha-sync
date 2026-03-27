@@ -70,8 +70,15 @@ export default {
 
                 console.log(`Processing order ${action} for ID: ${orderId}`);
 
-                // Extract phone and remove non-numeric characters
-                const rawPhone = orderData?.billing?.phone;
+                // Skip if customer has not opted in to WhatsApp messages
+                if (orderData?.whatsapp_opt_in !== 'yes') {
+                    console.log(`Order ${orderId}: WhatsApp opt-in is '${orderData?.whatsapp_opt_in}', skipping.`);
+                    message.ack();
+                    continue;
+                }
+
+                // Prefer whatsapp_number from meta_data, fall back to billing.phone
+                const rawPhone = orderData?.whatsapp_number || orderData?.billing?.phone;
                 if (rawPhone) {
                     let numericPhone = rawPhone.replace(/\\D/g, '');
 
@@ -151,7 +158,7 @@ export default {
                         console.log(`Order ${orderId} has invalid phone number format or length: '${rawPhone}' -> '${numericPhone}'`);
                     }
                 } else {
-                    console.log(`Order ${orderId} has no billing.phone field, skipping WhatsApp message.`);
+                    console.log(`Order ${orderId} has no phone number available, skipping WhatsApp message.`);
                 }
 
                 // Acknowledge the message so it's removed from the queue

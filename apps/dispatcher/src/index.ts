@@ -122,10 +122,24 @@ export default {
             // If the webhook is for an order
             if (topic.startsWith('order.')) {
                 if (env.ORDER_SYNC) {
+                    // Extract WhatsApp-specific fields from meta_data
+                    const metaData: Array<{ key: string; value: string }> = body.meta_data || [];
+                    const whatsappNumber = metaData.find((m: { key: string }) => m.key === 'whatsapp_number')?.value;
+                    const whatsappOptIn = metaData.find((m: { key: string }) => m.key === 'whatsapp_opt_in')?.value;
+
                     await env.ORDER_SYNC.send({
                         action: topic.replace('order.', ''), // created, updated, deleted, restored
                         id: objectId,
-                        data: body
+                        data: {
+                            status: body.status,
+                            number: body.number,
+                            billing: {
+                                phone: body.billing?.phone,
+                                first_name: body.billing?.first_name,
+                            },
+                            whatsapp_number: whatsappNumber,
+                            whatsapp_opt_in: whatsappOptIn,
+                        }
                     });
                     console.log(`Queued order ${objectId} to ORDER_SYNC`);
                 } else {
