@@ -73,9 +73,16 @@ export default {
                 // Extract phone and remove non-numeric characters
                 const rawPhone = orderData?.billing?.phone;
                 if (rawPhone) {
-                    const numericPhone = rawPhone.replace(/\\D/g, '');
+                    let numericPhone = rawPhone.replace(/\\D/g, '');
 
-                    if (numericPhone) {
+                    // Format Sri Lankan phone numbers
+                    if (numericPhone.startsWith('0') && numericPhone.length === 10) {
+                        numericPhone = '94' + numericPhone.substring(1);
+                    } else if (numericPhone.length === 9) {
+                        numericPhone = '94' + numericPhone;
+                    }
+
+                    if (numericPhone.length >= 10 && numericPhone.length <= 15) {
                         console.log(`Sending WhatsApp message to ${numericPhone} for order ${orderId}`);
 
                         const orderStatus = orderData?.status;
@@ -99,7 +106,7 @@ export default {
 
                         const wabaPayload = {
                             messaging_product: "whatsapp",
-                            to: "+94713280622",
+                            to: numericPhone,
                             type: "template",
                             template: {
                                 name: templateName,
@@ -141,7 +148,7 @@ export default {
 
                         console.log(`WhatsApp message sent successfully for order ${orderId}`);
                     } else {
-                        console.log(`Order ${orderId} has phone field but contains no digits: ${rawPhone}`);
+                        console.log(`Order ${orderId} has invalid phone number format or length: '${rawPhone}' -> '${numericPhone}'`);
                     }
                 } else {
                     console.log(`Order ${orderId} has no billing.phone field, skipping WhatsApp message.`);
