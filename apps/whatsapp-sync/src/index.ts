@@ -1,11 +1,15 @@
-import type { MessageBatch } from '@cloudflare/workers-types';
+import type { MessageBatch, KVNamespace } from '@cloudflare/workers-types';
 
 interface Env {
     WHATSAPP_ACCESS_TOKEN: string;
     WHATSAPP_PHONE_NUMBER_ID: string;
     WHATSAPP_TEMPLATE_NAME?: string;
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: string;
+    WHATSAPP_STATE: KVNamespace;
 }
+
+// TTL for KV dedup entries: 30 days in seconds
+const DEDUP_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 export default {
     async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
@@ -77,6 +81,19 @@ export default {
                     continue;
                 }
 
+                const orderStatus = orderData?.status;
+
+                // --- Status-change deduplication ---
+                // Check if we've already notified this order for this exact status
+                const dedupKey = `order:${orderId}:last_notified_status`;
+                const lastNotifiedStatus = await env.WHATSAPP_STATE.get(dedupKey);
+
+                if (lastNotifiedStatus === orderStatus) {
+                    console.log(`Order ${orderId}: Already notified for status '${orderStatus}', skipping duplicate.`);
+                    message.ack();
+                    continue;
+                }
+
                 // Prefer whatsapp_number from meta_data, fall back to billing.phone
                 const rawPhone = orderData?.whatsapp_number || orderData?.billing?.phone;
                 if (rawPhone) {
@@ -91,8 +108,6 @@ export default {
 
                     if (numericPhone.length >= 10 && numericPhone.length <= 15) {
                         console.log(`Sending WhatsApp message to ${numericPhone} for order ${orderId}`);
-
-                        const orderStatus = orderData?.status;
 
                         // Define your template names here based on the status
                         const STATUS_TEMPLATES: Record<string, string> = {
@@ -153,7 +168,9 @@ export default {
                             throw new Error(`WhatsApp API request failed: ${response.status}`);
                         }
 
-                        console.log(`WhatsApp message sent successfully for order ${orderId}`);
+                        // Message sent successfully — record the status in KV to prevent duplicates
+                        await env.WHATSAPP_STATE.put(dedupKey, orderStatus, { expirationTtl: DEDUP_TTL_SECONDS });
+                        console.log(`WhatsApp message sent successfully for order ${orderId}, recorded status '${orderStatus}' in KV`);
                     } else {
                         console.log(`Order ${orderId} has invalid phone number format or length: '${rawPhone}' -> '${numericPhone}'`);
                     }

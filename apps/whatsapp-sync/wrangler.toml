@@ -7,6 +7,10 @@ queue = "order-sync-queue"
 max_batch_size = 10
 max_batch_timeout = 5
 
+[[kv_namespaces]]
+binding = "WHATSAPP_STATE"
+id = "043bfd742fe2431f8f3afbb242464258"
+
 [observability]
 enabled = true
 head_sampling_rate = 1
@@ -23,9 +27,13 @@ workers_dev = true
 
 [env.staging.vars]
 # WHATSAPP_ACCESS_TOKEN = "" # Set via: npx wrangler secret put WHATSAPP_ACCESS_TOKEN --env staging
-# WHATSAPP_PHONE_NUMBER_ID = "" # Set via: npx wrangler secret put WHATSAPP_PHONE_NUMBER_ID --env staging
+# WHATSAPP_PHONE_NUMBER_ID = "" # Set via: npx wrangler secret put WHATSAPP_PHONE_NUMBER_ID --env staging 995263100344678
 WHATSAPP_TEMPLATE_NAME = "order_received_simple"
 # WHATSAPP_WEBHOOK_VERIFY_TOKEN = "" # Set via: npx wrangler secret put WHATSAPP_WEBHOOK_VERIFY_TOKEN --env staging
+
+[[env.staging.kv_namespaces]]
+binding = "WHATSAPP_STATE"
+id = "0efbfce4ba1941ea86c5864adb6930d2"
 
 [[env.staging.queues.consumers]]
 queue = "staging-order-sync-queue"
