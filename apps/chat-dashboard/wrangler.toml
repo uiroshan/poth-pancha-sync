@@ -1,0 +1,21 @@
+name = "chat-dashboard"
+main = "src/index.tsx"
+compatibility_date = "2024-04-03"
+
+[[d1_databases]]
+binding = "WHATSAPP_DB"
+database_name = "whatsapp-db"
+database_id = "0bd745eb-07af-4eb4-82d9-0639252138ca"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[env.staging]
+name = "chat-dashboard-staging"
+workers_dev = true
+
+[[env.staging.d1_databases]]
+binding = "WHATSAPP_DB"
+database_name = "whatsapp-db-staging"
+database_id = "39e7599c-4349-4ce9-b5ed-3869e7e7f210"
