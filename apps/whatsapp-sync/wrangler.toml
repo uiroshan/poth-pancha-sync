@@ -19,7 +19,7 @@ head_sampling_rate = 1
 [vars]
 # WHATSAPP_ACCESS_TOKEN = "" # Set via: npx wrangler secret put WHATSAPP_ACCESS_TOKEN
 # WHATSAPP_PHONE_NUMBER_ID = "" # Set via: npx wrangler secret put WHATSAPP_PHONE_NUMBER_ID
-WHATSAPP_TEMPLATE_NAME = "order_received_simple"
+# WHATSAPP_TEMPLATE_NAME = "order_received_simple"
 # WHATSAPP_WEBHOOK_VERIFY_TOKEN = "" # Set via: npx wrangler secret put WHATSAPP_WEBHOOK_VERIFY_TOKEN
 
 [env.staging]
