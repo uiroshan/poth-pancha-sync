@@ -7,9 +7,10 @@ queue = "order-sync-queue"
 max_batch_size = 10
 max_batch_timeout = 5
 
-[[kv_namespaces]]
-binding = "WHATSAPP_STATE"
-id = "043bfd742fe2431f8f3afbb242464258"
+[[d1_databases]]
+binding = "WHATSAPP_DB"
+database_name = "whatsapp-db"
+database_id = "0bd745eb-07af-4eb4-82d9-0639252138ca"
 
 [observability]
 enabled = true
@@ -31,9 +32,10 @@ workers_dev = true
 WHATSAPP_TEMPLATE_NAME = "order_received_simple"
 # WHATSAPP_WEBHOOK_VERIFY_TOKEN = "" # Set via: npx wrangler secret put WHATSAPP_WEBHOOK_VERIFY_TOKEN --env staging
 
-[[env.staging.kv_namespaces]]
-binding = "WHATSAPP_STATE"
-id = "0efbfce4ba1941ea86c5864adb6930d2"
+[[env.staging.d1_databases]]
+binding = "WHATSAPP_DB"
+database_name = "whatsapp-db-staging"
+database_id = "39e7599c-4349-4ce9-b5ed-3869e7e7f210"
 
 [[env.staging.queues.consumers]]
 queue = "staging-order-sync-queue"
