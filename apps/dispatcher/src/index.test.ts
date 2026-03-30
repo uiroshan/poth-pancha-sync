@@ -60,7 +60,10 @@ describe('Dispatcher Worker', () => {
         const payload = JSON.stringify({
             id: 100,
             name: 'Test Product',
-            price: '10.00'
+            price: '10.00',
+            slug: 'test-product',
+            status: 'publish',
+            type: 'simple'
         });
         const signature = await generateSignature(payload, mockEnv.WEBHOOK_SECRET);
 

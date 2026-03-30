@@ -109,7 +109,12 @@ export default {
                     'failed': 'order_failed_template'
                 };
 
-                const templateName = orderStatus ? STATUS_TEMPLATES[orderStatus] : null;
+                let templateName = orderStatus ? STATUS_TEMPLATES[orderStatus] : null;
+                const wayBillId = orderData?.way_bill_id;
+
+                if (orderStatus === 'completed' && wayBillId) {
+                    templateName = 'order_completed_with_tracking_template';
+                }
 
                 if (!templateName) {
                     console.log(`Skipping WhatsApp message for order ${orderId}: No template configured for status '${orderStatus}'`);
@@ -158,6 +163,58 @@ export default {
                 const customerName = orderData?.billing?.first_name || 'Customer';
                 const orderNumber = orderData?.number ? String(orderData.number) : String(orderId);
 
+                const components: any[] = [
+                    {
+                        type: "body",
+                        parameters: [
+                            {
+                                type: "text",
+                                parameter_name: "customer_name",
+                                text: customerName
+                            },
+                            {
+                                type: "text",
+                                parameter_name: "order_id",
+                                text: orderNumber
+                            }
+                        ]
+                    }
+                ];
+
+                if (templateName === 'order_completed_with_tracking_template') {
+                    // Ensure the tracking phone string is never empty to prevent WhatsApp API validation errors
+                    const trackingPhone = orderData?.billing?.phone || rawPhone;
+
+                    // For dynamic URL buttons, parameters must be passed in a "button" component array,
+                    // NOT in the "body" component. The index maps to the button's position (0-based) in WhatsApp Manager.
+                    components.push({
+                        type: "button",
+                        sub_type: "url",
+                        index: "0",
+                        parameters: [
+                            {
+                                type: "text",
+                                parameter_name: "way_bill_id",
+                                text: String(wayBillId)
+                            }
+                        ]
+                    });
+
+                    // If your template has a second dynamic URL button (e.g. for phone number):
+                    components.push({
+                        type: "button",
+                        sub_type: "url",
+                        index: "1",
+                        parameters: [
+                            {
+                                type: "text",
+                                parameter_name: "mobile_number",
+                                text: trackingPhone
+                            }
+                        ]
+                    });
+                }
+
                 const wabaPayload = {
                     messaging_product: "whatsapp",
                     to: numericPhone,
@@ -165,23 +222,7 @@ export default {
                     template: {
                         name: templateName,
                         language: { code: "en_US" },
-                        components: [
-                            {
-                                type: "body",
-                                parameters: [
-                                    {
-                                        type: "text",
-                                        parameter_name: "customer_name",
-                                        text: customerName
-                                    },
-                                    {
-                                        type: "text",
-                                        parameter_name: "order_id",
-                                        text: orderNumber
-                                    }
-                                ]
-                            }
-                        ]
+                        components: components
                     }
                 };
 
