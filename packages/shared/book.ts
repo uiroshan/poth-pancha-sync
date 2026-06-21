@@ -135,9 +135,10 @@ export function transformWooCommerceBook(body: any): BookProduct {
     const seriesNoAttr = attributes.find((a: any) => a.name?.toLowerCase() === 'seriesno');
     const seriesNo = seriesNoAttr?.options?.[0] || undefined;
 
-    const noOfPagesAttr = attributes.find((a: any) =>
-        a.name?.toLowerCase() === 'noofpages' || a.name?.toLowerCase() === 'number of pages'
-    );
+    const noOfPagesAttr = attributes.find((a: any) => {
+        const lowerName = a.name?.toLowerCase();
+        return lowerName === 'noofpages' || lowerName === 'number of pages' || lowerName === 'pages' || lowerName === 'page';
+    });
     const noOfPages = noOfPagesAttr ? parseInt(noOfPagesAttr.options?.[0], 10) || 0 : 0;
 
     const ageRangeAttr = attributes.find((a: any) =>
