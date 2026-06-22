@@ -137,7 +137,7 @@ export function transformWooCommerceBook(body: any): BookProduct {
 
     const noOfPagesAttr = attributes.find((a: any) => {
         const lowerName = a.name?.toLowerCase();
-        return lowerName === 'noofpages' || lowerName === 'number of pages' || lowerName === 'pages' || lowerName === 'page';
+        return lowerName === 'no of pages';
     });
     const noOfPages = noOfPagesAttr ? parseInt(noOfPagesAttr.options?.[0], 10) || 0 : 0;
 

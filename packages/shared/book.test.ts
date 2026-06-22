@@ -25,7 +25,7 @@ describe('transformWooCommerceBook', () => {
             attributes: [
                 { name: 'Writer', options: ['Jane Doe'] },
                 { name: 'Language', options: ['English'] },
-                { name: 'Pages', options: ['120'] },
+                { name: 'No of Pages', options: ['120'] },
                 { name: 'AgeRange', options: ['4-8'] },
                 { name: 'ISBN', options: ['9781234567890'] }
             ],

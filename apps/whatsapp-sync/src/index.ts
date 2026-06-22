@@ -185,8 +185,10 @@ export default {
                     // Ensure the tracking phone string is never empty to prevent WhatsApp API validation errors
                     const trackingPhone = orderData?.billing?.phone || rawPhone;
 
-                    // For dynamic URL buttons, parameters must be passed in a "button" component array,
-                    // NOT in the "body" component. The index maps to the button's position (0-based) in WhatsApp Manager.
+                    // Combine the variables into a single URL-safe string using a delimiter (e.g., __)
+                    // The Next.js endpoint on pothpancha.lk will split this string back into two values.
+                    const trackingPayload = `${wayBillId}__${trackingPhone}`;
+
                     components.push({
                         type: "button",
                         sub_type: "url",
@@ -194,22 +196,7 @@ export default {
                         parameters: [
                             {
                                 type: "text",
-                                parameter_name: "way_bill_id",
-                                text: String(wayBillId)
-                            }
-                        ]
-                    });
-
-                    // If your template has a second dynamic URL button (e.g. for phone number):
-                    components.push({
-                        type: "button",
-                        sub_type: "url",
-                        index: "1",
-                        parameters: [
-                            {
-                                type: "text",
-                                parameter_name: "mobile_number",
-                                text: trackingPhone
+                                text: trackingPayload
                             }
                         ]
                     });
